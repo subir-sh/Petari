@@ -296,14 +296,14 @@ button {
   cursor: pointer;
 }
 
-@media (max-width: 420px) {
+@media (max-width: 319px) {
   .sticky__format-actions,
   .sticky__divider {
     display: none;
   }
 }
 
-@media (max-width: 240px) {
+@media (max-width: 180px) {
   .sticky__title,
   .sticky__secondary-control {
     display: none;
