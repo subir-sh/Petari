@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { documentDir, join } from "@tauri-apps/api/path";
 import { getCurrentWindow, PhysicalPosition, PhysicalSize } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { mkdir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import StickyEditor from "./components/StickyEditor";
 import {
   DEFAULT_PETARI_METADATA,
@@ -20,6 +21,29 @@ type OpenSticky = {
 
 function fileName(path: string) {
   return path.split(/[\\/]/).pop() ?? path;
+}
+
+function emptyDocument(): StickyDocument {
+  return {
+    metadata: {},
+    petari: { ...DEFAULT_PETARI_METADATA },
+    body: "",
+  };
+}
+
+async function defaultSticky() {
+  const directory = await join(await documentDir(), "Petari");
+  const path = await join(directory, "note.md");
+
+  try {
+    return { path, source: await readTextFile(path) };
+  } catch {
+    const document = emptyDocument();
+    const source = serializeStickyDocument(document);
+    await mkdir(directory, { recursive: true });
+    await writeTextFile(path, source);
+    return { path, source };
+  }
 }
 
 function openStickyWindow(path: string) {
@@ -43,11 +67,7 @@ function App() {
   const persist = () => {
     const current = stickyRef.current;
     if (!current) return;
-
-    void writeTextFile(
-      current.path,
-      serializeStickyDocument(current.document),
-    );
+    void writeTextFile(current.path, serializeStickyDocument(current.document));
   };
 
   const schedulePersist = () => {
@@ -56,18 +76,18 @@ function App() {
   };
 
   useEffect(() => {
-    if (!INITIAL_PATH) return;
-
     void (async () => {
-      const source = await readTextFile(INITIAL_PATH);
-      const document = parseStickyDocument(source);
+      const loaded = INITIAL_PATH
+        ? { path: INITIAL_PATH, source: await readTextFile(INITIAL_PATH) }
+        : await defaultSticky();
+      const document = parseStickyDocument(loaded.source);
       const appWindow = getCurrentWindow();
 
       await appWindow.setPosition(new PhysicalPosition(document.petari.x, document.petari.y));
       await appWindow.setSize(new PhysicalSize(document.petari.width, document.petari.height));
       await appWindow.setAlwaysOnTop(document.petari.alwaysOnTop);
 
-      const next = { path: INITIAL_PATH, document };
+      const next = { path: loaded.path, document };
       stickyRef.current = next;
       setSticky(next);
     })();
@@ -115,15 +135,7 @@ function App() {
   const createMarkdown = async () => {
     const path = await save({ defaultPath: "note.md" });
     if (!path) return;
-
-    await writeTextFile(
-      path,
-      serializeStickyDocument({
-        metadata: {},
-        petari: { ...DEFAULT_PETARI_METADATA },
-        body: "",
-      }),
-    );
+    await writeTextFile(path, serializeStickyDocument(emptyDocument()));
     openStickyWindow(path);
   };
 
@@ -135,20 +147,7 @@ function App() {
     if (typeof path === "string") openStickyWindow(path);
   };
 
-  if (!sticky) {
-    return (
-      <main className="sticky launcher">
-        <header className="sticky__titlebar" data-tauri-drag-region>Petari</header>
-        <section className="launcher__content">
-          <strong>Markdown stickies for your desktop.</strong>
-          <div className="launcher__actions">
-            <button className="primary-button" onClick={createMarkdown}>New sticky</button>
-            <button className="secondary-button" onClick={openMarkdown}>Open Markdown</button>
-          </div>
-        </section>
-      </main>
-    );
-  }
+  if (!sticky) return <main className="sticky" />;
 
   const title = typeof sticky.document.metadata.title === "string"
     ? sticky.document.metadata.title
@@ -157,10 +156,14 @@ function App() {
   return (
     <main className="sticky">
       <header className="sticky__titlebar" data-tauri-drag-region>
-        <span data-tauri-drag-region>{title}</span>
+        <span className="sticky__title" data-tauri-drag-region>{title}</span>
         <div className="sticky__actions">
-          <button className="icon-button" onClick={toggleAlwaysOnTop}>●</button>
-          <button className="icon-button" onClick={() => getCurrentWindow().close()}>×</button>
+          <button className="icon-button" title="New sticky" onClick={createMarkdown}>+</button>
+          <button className="icon-button" title="Open Markdown" onClick={openMarkdown}>↗</button>
+          <button className="icon-button" title="Always on top" onClick={toggleAlwaysOnTop}>
+            {sticky.document.petari.alwaysOnTop ? "●" : "○"}
+          </button>
+          <button className="icon-button" title="Close" onClick={() => getCurrentWindow().close()}>×</button>
         </div>
       </header>
       <StickyEditor markdown={sticky.document.body} onChange={updateBody} />
