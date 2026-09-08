@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { documentDir, join } from "@tauri-apps/api/path";
 import { getCurrentWindow, PhysicalPosition, PhysicalSize } from "@tauri-apps/api/window";
 import { WebviewWindow, getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
-import { mkdir, readDir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { mkdir, readDir, readTextFile, remove, writeTextFile } from "@tauri-apps/plugin-fs";
 import StickyEditor, { type StickyEditorHandle } from "./components/StickyEditor";
 import {
   DEFAULT_PETARI_METADATA,
@@ -61,10 +61,14 @@ async function loadStickies(): Promise<StickyFile[]> {
 async function nextStickyPath() {
   const directory = await petariDirectory();
   const entries = await readDir(directory);
-  const numbers = entries
-    .filter((entry) => entry.isFile && /^\d+\.md$/i.test(entry.name))
-    .map((entry) => Number(entry.name.replace(/\.md$/i, "")));
-  const next = numbers.length === 0 ? 1 : Math.max(...numbers) + 1;
+  const numbers = new Set(
+    entries
+      .filter((entry) => entry.isFile && /^\d+\.md$/i.test(entry.name))
+      .map((entry) => Number(entry.name.replace(/\.md$/i, ""))),
+  );
+
+  let next = 1;
+  while (numbers.has(next)) next += 1;
   return join(directory, `${next}.md`);
 }
 
@@ -147,11 +151,15 @@ function preview(body: string) {
 
 function ListView() {
   const [stickies, setStickies] = useState<StickyFile[]>([]);
+  const [query, setQuery] = useState("");
 
   const reload = async () => setStickies(await loadStickies());
 
   useEffect(() => {
     void reload();
+    const handleFocus = () => void reload();
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
   }, []);
 
   const openSticky = async (sticky: StickyFile) => {
@@ -168,28 +176,64 @@ function ListView() {
     await reload();
   };
 
+  const deleteSticky = async (sticky: StickyFile) => {
+    const stickyWindow = await WebviewWindow.getByLabel(`sticky-${sticky.number}`);
+    if (stickyWindow) await stickyWindow.destroy();
+    await remove(sticky.path);
+    await reload();
+  };
+
+  const showAll = async () => {
+    const windows = await getAllWebviewWindows();
+    for (const appWindow of windows.filter((value) => value.label.startsWith("sticky-"))) {
+      await appWindow.setFocus();
+    }
+  };
+
   const quit = async () => {
     const windows = await getAllWebviewWindows();
-    await Promise.all(windows.map((window) => window.destroy()));
+    await Promise.all(windows.map((appWindow) => appWindow.destroy()));
   };
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredStickies = normalizedQuery
+    ? stickies.filter((sticky) =>
+        String(sticky.number).includes(normalizedQuery)
+        || sticky.document.body.toLowerCase().includes(normalizedQuery))
+    : stickies;
 
   return (
     <main className="note-list">
       <header className="note-list__titlebar" data-tauri-drag-region>
-        <strong data-tauri-drag-region>Petari</strong>
+        <span className="note-list__title" data-tauri-drag-region>Petari</span>
         <button className="icon-button" title="Close" onClick={() => getCurrentWindow().close()}>×</button>
       </header>
+
+      <div className="note-list__search">
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search notes..."
+          aria-label="Search notes"
+        />
+      </div>
+
       <div className="note-list__items">
-        {stickies.map((sticky) => (
-          <button key={sticky.path} className="note-list__item" onClick={() => openSticky(sticky)}>
-            <span className="note-list__number">{sticky.number}</span>
-            <span className="note-list__preview">{preview(sticky.document.body)}</span>
-          </button>
+        {filteredStickies.map((sticky) => (
+          <div key={sticky.path} className="note-list__item">
+            <button className="note-list__open" onClick={() => openSticky(sticky)}>
+              <span className="note-list__number">{sticky.number}</span>
+              <span className="note-list__preview">{preview(sticky.document.body)}</span>
+            </button>
+            <button className="note-list__delete" title="Delete note" onClick={() => deleteSticky(sticky)}>×</button>
+          </div>
         ))}
       </div>
+
       <footer className="note-list__footer">
-        <button onClick={createSticky}>+ New sticky</button>
-        <button onClick={quit}>Quit Petari</button>
+        <button onClick={createSticky}>+ New</button>
+        <button onClick={showAll}>Show all</button>
+        <button onClick={quit}>Quit</button>
       </footer>
     </main>
   );
