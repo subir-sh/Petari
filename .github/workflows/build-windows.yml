@@ -1,9 +1,20 @@
-name: Build Windows
+name: Build Windows executable
 
 on:
   push:
     branches: [main]
+    paths:
+      - "src/**"
+      - "src-tauri/**"
+      - "package.json"
+      - "index.html"
+      - "vite.config.ts"
+      - "tsconfig*.json"
+      - ".github/workflows/build-windows.yml"
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -15,10 +26,17 @@ jobs:
           node-version: lts/*
       - uses: dtolnay/rust-toolchain@stable
       - run: npm install
-      - run: npm run tauri build -- --bundles nsis
-      - uses: actions/upload-artifact@v4
-        with:
-          name: petari-windows
-          path: |
-            src-tauri/target/release/petari.exe
-            src-tauri/target/release/bundle/nsis/*.exe
+      - run: npm run tauri build -- --no-bundle
+      - name: Put executable in repository root
+        shell: pwsh
+        run: Copy-Item src-tauri/target/release/petari.exe Petari.exe -Force
+      - name: Commit executable
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Petari.exe
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) { exit 0 }
+          git commit -m "build: update Windows executable [skip ci]"
+          git push
