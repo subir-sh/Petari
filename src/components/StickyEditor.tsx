@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type ClipboardEvent } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { Markdown } from "@tiptap/markdown";
 import StarterKit from "@tiptap/starter-kit";
@@ -7,6 +7,22 @@ type StickyEditorProps = {
   markdown: string;
   onChange: (markdown: string) => void;
 };
+
+function preserveRichText(event: ClipboardEvent<HTMLDivElement>) {
+  const selection = window.getSelection();
+
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+
+  const range = selection.getRangeAt(0);
+  if (!event.currentTarget.contains(range.commonAncestorContainer)) return;
+
+  const container = document.createElement("div");
+  container.appendChild(range.cloneContents());
+
+  event.clipboardData.setData("text/plain", selection.toString());
+  event.clipboardData.setData("text/html", container.innerHTML);
+  event.preventDefault();
+}
 
 function StickyEditor({ markdown, onChange }: StickyEditorProps) {
   const editor = useEditor({
@@ -64,7 +80,9 @@ function StickyEditor({ markdown, onChange }: StickyEditorProps) {
         </button>
       </div>
 
-      <EditorContent className="sticky__editor" editor={editor} />
+      <div className="sticky__editor" onCopy={preserveRichText}>
+        <EditorContent editor={editor} />
+      </div>
     </section>
   );
 }
