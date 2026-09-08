@@ -50,6 +50,14 @@ function App() {
   const [sticky, setSticky] = useState<OpenSticky | null>(null);
   const stickyRef = useRef<OpenSticky | null>(null);
   const saveTimerRef = useRef<number | null>(null);
+  const closingRef = useRef(false);
+
+  const clearScheduledPersist = () => {
+    if (saveTimerRef.current === null) return;
+
+    window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = null;
+  };
 
   const persistNow = async () => {
     const current = stickyRef.current;
@@ -62,14 +70,21 @@ function App() {
   };
 
   const schedulePersist = () => {
-    if (saveTimerRef.current !== null) {
-      window.clearTimeout(saveTimerRef.current);
-    }
+    clearScheduledPersist();
 
     saveTimerRef.current = window.setTimeout(() => {
       saveTimerRef.current = null;
       void persistNow();
     }, SAVE_DELAY_MS);
+  };
+
+  const flushAndDestroy = async () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+
+    clearScheduledPersist();
+    await persistNow();
+    await getCurrentWindow().destroy();
   };
 
   const loadMarkdown = async (path: string) => {
@@ -159,16 +174,6 @@ function App() {
     await persistNow();
   };
 
-  const closeWindow = async () => {
-    if (saveTimerRef.current !== null) {
-      window.clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
-    }
-
-    await persistNow();
-    await getCurrentWindow().close();
-  };
-
   useEffect(() => {
     if (INITIAL_PATH) {
       void loadMarkdown(INITIAL_PATH);
@@ -178,6 +183,7 @@ function App() {
   useEffect(() => {
     let unlistenMoved: UnlistenFn | undefined;
     let unlistenResized: UnlistenFn | undefined;
+    let unlistenClose: UnlistenFn | undefined;
 
     const listen = async () => {
       const appWindow = getCurrentWindow();
@@ -199,6 +205,13 @@ function App() {
         current.document.petari.height = payload.height;
         schedulePersist();
       });
+
+      if (INITIAL_PATH) {
+        unlistenClose = await appWindow.onCloseRequested((event) => {
+          event.preventDefault();
+          void flushAndDestroy();
+        });
+      }
     };
 
     void listen();
@@ -206,10 +219,8 @@ function App() {
     return () => {
       unlistenMoved?.();
       unlistenResized?.();
-
-      if (saveTimerRef.current !== null) {
-        window.clearTimeout(saveTimerRef.current);
-      }
+      unlistenClose?.();
+      clearScheduledPersist();
     };
   }, []);
 
@@ -224,7 +235,7 @@ function App() {
             className="icon-button"
             type="button"
             aria-label="Close sticky"
-            onClick={closeWindow}
+            onClick={flushAndDestroy}
           >
             ×
           </button>
@@ -239,7 +250,12 @@ function App() {
       <main className="sticky launcher">
         <header className="sticky__titlebar" data-tauri-drag-region>
           <span data-tauri-drag-region>Petari</span>
-          <button className="icon-button" type="button" onClick={closeWindow}>
+          <button
+            className="icon-button"
+            type="button"
+            aria-label="Close Petari"
+            onClick={flushAndDestroy}
+          >
             ×
           </button>
         </header>
@@ -284,7 +300,7 @@ function App() {
             className="icon-button"
             type="button"
             aria-label="Close sticky"
-            onClick={closeWindow}
+            onClick={flushAndDestroy}
           >
             ×
           </button>
