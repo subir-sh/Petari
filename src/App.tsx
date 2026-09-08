@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import type { UnlistenFn } from "@tauri-apps/api/event";
 import {
   getCurrentWindow,
   PhysicalPosition,
   PhysicalSize,
-  type UnlistenFn,
 } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
