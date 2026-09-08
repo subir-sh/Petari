@@ -5,6 +5,7 @@ import {
   PhysicalPosition,
   PhysicalSize,
 } from "@tauri-apps/api/window";
+import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import {
@@ -14,6 +15,7 @@ import {
 } from "./lib/stickyDocument";
 
 const SAVE_DELAY_MS = 250;
+const INITIAL_PATH = new URLSearchParams(window.location.search).get("path");
 
 type OpenSticky = {
   path: string;
@@ -50,16 +52,8 @@ function App() {
     }, SAVE_DELAY_MS);
   };
 
-  const openMarkdown = async () => {
-    const selected = await open({
-      multiple: false,
-      directory: false,
-      filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
-    });
-
-    if (!selected || Array.isArray(selected)) return;
-
-    const source = await readTextFile(selected);
+  const loadMarkdown = async (path: string) => {
+    const source = await readTextFile(path);
     const document = parseStickyDocument(source);
     const appWindow = getCurrentWindow();
 
@@ -71,9 +65,35 @@ function App() {
     );
     await appWindow.setAlwaysOnTop(document.petari.alwaysOnTop);
 
-    const next = { path: selected, document };
+    const next = { path, document };
     stickyRef.current = next;
     setSticky(next);
+  };
+
+  const openMarkdown = async () => {
+    const selected = await open({
+      multiple: false,
+      directory: false,
+      filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
+    });
+
+    if (!selected || Array.isArray(selected)) return;
+
+    const label = `sticky-${crypto.randomUUID()}`;
+    const stickyWindow = new WebviewWindow(label, {
+      url: `index.html?path=${encodeURIComponent(selected)}`,
+      title: fileName(selected),
+      width: 340,
+      height: 360,
+      minWidth: 240,
+      minHeight: 180,
+      decorations: false,
+      resizable: true,
+    });
+
+    stickyWindow.once("tauri://error", ({ payload }) => {
+      console.error("Failed to create sticky window", payload);
+    });
   };
 
   const updateBody = (body: string) => {
@@ -127,6 +147,12 @@ function App() {
   };
 
   useEffect(() => {
+    if (INITIAL_PATH) {
+      void loadMarkdown(INITIAL_PATH);
+    }
+  }, []);
+
+  useEffect(() => {
     let unlistenMoved: UnlistenFn | undefined;
     let unlistenResized: UnlistenFn | undefined;
 
@@ -163,6 +189,27 @@ function App() {
       }
     };
   }, []);
+
+  if (!sticky && INITIAL_PATH) {
+    return (
+      <main className="sticky">
+        <header className="sticky__titlebar" data-tauri-drag-region>
+          <span className="sticky__title" data-tauri-drag-region>
+            {fileName(INITIAL_PATH)}
+          </span>
+          <button
+            className="icon-button"
+            type="button"
+            aria-label="Close sticky"
+            onClick={closeWindow}
+          >
+            ×
+          </button>
+        </header>
+        <section className="launcher__content">Loading…</section>
+      </main>
+    );
+  }
 
   if (!sticky) {
     return (
