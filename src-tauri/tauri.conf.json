@@ -14,8 +14,8 @@
       {
         "label": "main",
         "title": "Petari",
-        "width": 360,
-        "height": 420,
+        "width": 340,
+        "height": 360,
         "minWidth": 240,
         "minHeight": 180,
         "decorations": false,
@@ -28,6 +28,6 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all"
+    "targets": "nsis"
   }
 }
