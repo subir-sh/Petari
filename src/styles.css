@@ -20,9 +20,12 @@ body {
 }
 
 button,
-input,
 textarea {
   font: inherit;
+}
+
+button {
+  color: inherit;
 }
 
 .sticky {
@@ -30,31 +33,80 @@ textarea {
   min-width: 0;
   height: 100%;
   flex-direction: column;
+  background: #fff4b8;
 }
 
 .sticky__titlebar {
   display: flex;
   min-height: 34px;
   align-items: center;
-  padding: 0 12px;
+  justify-content: space-between;
+  gap: 8px;
+  padding-left: 12px;
   border-bottom: 1px solid rgb(0 0 0 / 8%);
   font-size: 12px;
   font-weight: 600;
   user-select: none;
 }
 
-.sticky__content {
+.sticky__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sticky__actions {
+  display: flex;
+  align-self: stretch;
+}
+
+.icon-button {
+  width: 34px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.icon-button:hover,
+.icon-button:focus-visible,
+.icon-button.is-active {
+  background: rgb(0 0 0 / 8%);
+}
+
+.sticky__editor {
   min-height: 0;
   flex: 1;
+  width: 100%;
+  resize: none;
+  border: 0;
+  outline: 0;
   padding: 16px;
+  color: inherit;
+  background: transparent;
+  font: 14px/1.55 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
 }
 
-.sticky__content h1 {
-  margin: 0 0 8px;
-  font-size: 20px;
+.launcher__content {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
 }
 
-.sticky__content p {
-  margin: 0;
-  line-height: 1.5;
+.primary-button {
+  min-height: 36px;
+  border: 1px solid rgb(0 0 0 / 18%);
+  border-radius: 6px;
+  padding: 0 12px;
+  background: rgb(255 255 255 / 35%);
+  cursor: pointer;
+}
+
+.primary-button:hover,
+.primary-button:focus-visible {
+  background: rgb(255 255 255 / 60%);
 }
