@@ -14,12 +14,11 @@
       {
         "label": "main",
         "title": "Petari",
-        "width": 340,
-        "height": 360,
-        "minWidth": 240,
-        "minHeight": 180,
+        "width": 1,
+        "height": 1,
+        "visible": false,
         "decorations": false,
-        "resizable": true
+        "resizable": false
       }
     ],
     "security": {

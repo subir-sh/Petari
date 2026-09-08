@@ -10,6 +10,7 @@ export type PetariMetadata = {
   height: number;
   alwaysOnTop: boolean;
   color: PetariColor;
+  open: boolean;
 };
 
 export type StickyDocument = {
@@ -25,6 +26,7 @@ export const DEFAULT_PETARI_METADATA: PetariMetadata = {
   height: 360,
   alwaysOnTop: false,
   color: "yellow",
+  open: true,
 };
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/;

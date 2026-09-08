@@ -1,32 +1,36 @@
 import { useEffect, useRef, useState } from "react";
 import { documentDir, join } from "@tauri-apps/api/path";
 import { getCurrentWindow, PhysicalPosition, PhysicalSize } from "@tauri-apps/api/window";
-import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { mkdir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { WebviewWindow, getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
+import { mkdir, readDir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import StickyEditor, { type StickyEditorHandle } from "./components/StickyEditor";
 import {
   DEFAULT_PETARI_METADATA,
   PETARI_COLORS,
   parseStickyDocument,
   serializeStickyDocument,
+  type PetariMetadata,
   type StickyDocument,
 } from "./lib/stickyDocument";
 
-const INITIAL_PATH = new URLSearchParams(window.location.search).get("path");
+const params = new URLSearchParams(window.location.search);
+const INITIAL_PATH = params.get("path");
+const IS_LIST = params.has("list");
 
-type OpenSticky = {
+type StickyFile = {
   path: string;
+  number: number;
   document: StickyDocument;
 };
 
 function stickyNumber(path: string) {
-  return path.split(/[\\/]/).pop()?.replace(/\.md$/i, "") ?? "";
+  return Number(path.split(/[\\/]/).pop()?.replace(/\.md$/i, "") ?? 0);
 }
 
-function emptyDocument(): StickyDocument {
+function emptyDocument(overrides: Partial<PetariMetadata> = {}): StickyDocument {
   return {
     metadata: {},
-    petari: { ...DEFAULT_PETARI_METADATA },
+    petari: { ...DEFAULT_PETARI_METADATA, ...overrides },
     body: "",
   };
 }
@@ -37,49 +41,163 @@ async function petariDirectory() {
   return directory;
 }
 
-async function defaultSticky() {
-  const path = await join(await petariDirectory(), "1.md");
+async function loadStickies(): Promise<StickyFile[]> {
+  const directory = await petariDirectory();
+  const entries = await readDir(directory);
+  const markdown = entries
+    .filter((entry) => entry.isFile && /^\d+\.md$/i.test(entry.name))
+    .sort((a, b) => Number(a.name.replace(/\.md$/i, "")) - Number(b.name.replace(/\.md$/i, "")));
 
-  try {
-    return { path, source: await readTextFile(path) };
-  } catch {
-    const source = serializeStickyDocument(emptyDocument());
-    await writeTextFile(path, source);
-    return { path, source };
-  }
+  return Promise.all(markdown.map(async (entry) => {
+    const path = await join(directory, entry.name);
+    return {
+      path,
+      number: Number(entry.name.replace(/\.md$/i, "")),
+      document: parseStickyDocument(await readTextFile(path)),
+    };
+  }));
 }
 
 async function nextStickyPath() {
   const directory = await petariDirectory();
-  let number = 1;
-
-  while (true) {
-    const path = await join(directory, `${number}.md`);
-    try {
-      await readTextFile(path);
-      number += 1;
-    } catch {
-      return path;
-    }
-  }
+  const entries = await readDir(directory);
+  const numbers = entries
+    .filter((entry) => entry.isFile && /^\d+\.md$/i.test(entry.name))
+    .map((entry) => Number(entry.name.replace(/\.md$/i, "")));
+  const next = numbers.length === 0 ? 1 : Math.max(...numbers) + 1;
+  return join(directory, `${next}.md`);
 }
 
-function openStickyWindow(path: string) {
-  new WebviewWindow(`sticky-${crypto.randomUUID()}`, {
+async function openStickyWindow(path: string, metadata: PetariMetadata) {
+  const label = `sticky-${stickyNumber(path)}`;
+  const existing = await WebviewWindow.getByLabel(label);
+  if (existing) {
+    await existing.setFocus();
+    return;
+  }
+
+  new WebviewWindow(label, {
     url: `index.html?path=${encodeURIComponent(path)}`,
-    title: stickyNumber(path),
-    width: DEFAULT_PETARI_METADATA.width,
-    height: DEFAULT_PETARI_METADATA.height,
-    minWidth: 280,
+    title: String(stickyNumber(path)),
+    x: metadata.x,
+    y: metadata.y,
+    width: metadata.width,
+    height: metadata.height,
+    minWidth: 120,
     minHeight: 180,
     decorations: false,
     resizable: true,
   });
 }
 
-function App() {
-  const [sticky, setSticky] = useState<OpenSticky | null>(null);
-  const stickyRef = useRef<OpenSticky | null>(null);
+async function openListWindow() {
+  const existing = await WebviewWindow.getByLabel("list");
+  if (existing) {
+    await existing.setFocus();
+    return;
+  }
+
+  new WebviewWindow("list", {
+    url: "index.html?list=1",
+    title: "Petari",
+    width: 320,
+    height: 420,
+    minWidth: 260,
+    minHeight: 280,
+    decorations: false,
+    resizable: true,
+  });
+}
+
+function Bootstrap() {
+  useEffect(() => {
+    void (async () => {
+      let stickies = await loadStickies();
+
+      if (stickies.length === 0) {
+        const path = await nextStickyPath();
+        const document = emptyDocument();
+        await writeTextFile(path, serializeStickyDocument(document));
+        stickies = [{ path, number: 1, document }];
+      }
+
+      const open = stickies.filter((sticky) => sticky.document.petari.open);
+      if (open.length === 0) {
+        await openListWindow();
+      } else {
+        await Promise.all(open.map((sticky) => openStickyWindow(sticky.path, sticky.document.petari)));
+      }
+
+      await getCurrentWindow().destroy();
+    })();
+  }, []);
+
+  return <main className="bootstrap" />;
+}
+
+function preview(body: string) {
+  const line = body.split(/\r?\n/).map((value) => value.trim()).find(Boolean);
+  if (!line) return "Empty note";
+  return line
+    .replace(/^#{1,6}\s+/, "")
+    .replace(/^[-*+]\s+(?:\[[ xX]\]\s*)?/, "")
+    .replace(/[*_~`]/g, "")
+    .slice(0, 64);
+}
+
+function ListView() {
+  const [stickies, setStickies] = useState<StickyFile[]>([]);
+
+  const reload = async () => setStickies(await loadStickies());
+
+  useEffect(() => {
+    void reload();
+  }, []);
+
+  const openSticky = async (sticky: StickyFile) => {
+    sticky.document.petari.open = true;
+    await writeTextFile(sticky.path, serializeStickyDocument(sticky.document));
+    await openStickyWindow(sticky.path, sticky.document.petari);
+  };
+
+  const createSticky = async () => {
+    const path = await nextStickyPath();
+    const document = emptyDocument();
+    await writeTextFile(path, serializeStickyDocument(document));
+    await openStickyWindow(path, document.petari);
+    await reload();
+  };
+
+  const quit = async () => {
+    const windows = await getAllWebviewWindows();
+    await Promise.all(windows.map((window) => window.destroy()));
+  };
+
+  return (
+    <main className="note-list">
+      <header className="note-list__titlebar" data-tauri-drag-region>
+        <strong data-tauri-drag-region>Petari</strong>
+        <button className="icon-button" title="Close" onClick={() => getCurrentWindow().close()}>×</button>
+      </header>
+      <div className="note-list__items">
+        {stickies.map((sticky) => (
+          <button key={sticky.path} className="note-list__item" onClick={() => openSticky(sticky)}>
+            <span className="note-list__number">{sticky.number}</span>
+            <span className="note-list__preview">{preview(sticky.document.body)}</span>
+          </button>
+        ))}
+      </div>
+      <footer className="note-list__footer">
+        <button onClick={createSticky}>+ New sticky</button>
+        <button onClick={quit}>Quit Petari</button>
+      </footer>
+    </main>
+  );
+}
+
+function StickyView({ path }: { path: string }) {
+  const [sticky, setSticky] = useState<StickyFile | null>(null);
+  const stickyRef = useRef<StickyFile | null>(null);
   const editorRef = useRef<StickyEditorHandle | null>(null);
   const saveTimer = useRef<number | null>(null);
 
@@ -96,21 +214,18 @@ function App() {
 
   useEffect(() => {
     void (async () => {
-      const loaded = INITIAL_PATH
-        ? { path: INITIAL_PATH, source: await readTextFile(INITIAL_PATH) }
-        : await defaultSticky();
-      const document = parseStickyDocument(loaded.source);
+      const document = parseStickyDocument(await readTextFile(path));
       const appWindow = getCurrentWindow();
 
       await appWindow.setPosition(new PhysicalPosition(document.petari.x, document.petari.y));
       await appWindow.setSize(new PhysicalSize(document.petari.width, document.petari.height));
       await appWindow.setAlwaysOnTop(document.petari.alwaysOnTop);
 
-      const next = { path: loaded.path, document };
+      const next = { path, number: stickyNumber(path), document };
       stickyRef.current = next;
       setSticky(next);
     })();
-  }, []);
+  }, [path]);
 
   useEffect(() => {
     const appWindow = getCurrentWindow();
@@ -161,9 +276,23 @@ function App() {
   };
 
   const createSticky = async () => {
-    const path = await nextStickyPath();
-    await writeTextFile(path, serializeStickyDocument(emptyDocument()));
-    openStickyWindow(path);
+    if (!stickyRef.current) return;
+    const current = stickyRef.current.document.petari;
+    const document = emptyDocument({
+      x: current.x + 24,
+      y: current.y + 24,
+    });
+    const newPath = await nextStickyPath();
+    await writeTextFile(newPath, serializeStickyDocument(document));
+    await openStickyWindow(newPath, document.petari);
+  };
+
+  const closeSticky = async () => {
+    if (!stickyRef.current) return;
+    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
+    stickyRef.current.document.petari.open = false;
+    await writeTextFile(stickyRef.current.path, serializeStickyDocument(stickyRef.current.document));
+    await getCurrentWindow().close();
   };
 
   if (!sticky) return <main className="sticky" />;
@@ -171,9 +300,9 @@ function App() {
   return (
     <main className={`sticky sticky--${sticky.document.petari.color}`}>
       <header className="sticky__titlebar" data-tauri-drag-region>
-        <span className="sticky__title" data-tauri-drag-region>{stickyNumber(sticky.path)}</span>
-        <div className="sticky__actions">
-          <button className="icon-button" title="New sticky" onClick={createSticky}>+</button>
+        <span className="sticky__title" data-tauri-drag-region>{sticky.number}</span>
+
+        <div className="sticky__format-actions">
           <button className="icon-button" title="Bold" onMouseDown={(event) => {
             event.preventDefault();
             editorRef.current?.toggleBold();
@@ -197,15 +326,28 @@ function App() {
           <button className="icon-button" title="Change color" onClick={cycleColor}>
             <span className={`color-dot color-dot--${sticky.document.petari.color}`} />
           </button>
-          <button className="icon-button" title="Always on top" onClick={toggleAlwaysOnTop}>
+        </div>
+
+        <span className="sticky__divider" />
+
+        <div className="sticky__window-actions">
+          <button className="icon-button sticky__secondary-control" title="Notes list" onClick={openListWindow}>☷</button>
+          <button className="icon-button" title="New sticky" onClick={createSticky}>+</button>
+          <button className="icon-button sticky__secondary-control" title="Always on top" onClick={toggleAlwaysOnTop}>
             {sticky.document.petari.alwaysOnTop ? "●" : "○"}
           </button>
-          <button className="icon-button" title="Close" onClick={() => getCurrentWindow().close()}>×</button>
+          <button className="icon-button" title="Close" onClick={closeSticky}>×</button>
         </div>
       </header>
       <StickyEditor ref={editorRef} markdown={sticky.document.body} onChange={updateBody} />
     </main>
   );
+}
+
+function App() {
+  if (IS_LIST) return <ListView />;
+  if (INITIAL_PATH) return <StickyView path={INITIAL_PATH} />;
+  return <Bootstrap />;
 }
 
 export default App;
