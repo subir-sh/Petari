@@ -1,1 +1,0 @@
-Native build currently expects src-tauri/icons/icon.png.

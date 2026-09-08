@@ -1,10 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { UnlistenFn } from "@tauri-apps/api/event";
-import {
-  getCurrentWindow,
-  PhysicalPosition,
-  PhysicalSize,
-} from "@tauri-apps/api/window";
+import { getCurrentWindow, PhysicalPosition, PhysicalSize } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
@@ -16,7 +11,6 @@ import {
   type StickyDocument,
 } from "./lib/stickyDocument";
 
-const SAVE_DELAY_MS = 250;
 const INITIAL_PATH = new URLSearchParams(window.location.search).get("path");
 
 type OpenSticky = {
@@ -24,32 +18,12 @@ type OpenSticky = {
   document: StickyDocument;
 };
 
-function fileName(path: string): string {
+function fileName(path: string) {
   return path.split(/[\\/]/).pop() ?? path;
 }
 
-async function windowLabelForPath(path: string): Promise<string> {
-  const input = new TextEncoder().encode(path);
-  const digest = await crypto.subtle.digest("SHA-256", input);
-  const hash = Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  )
-    .join("")
-    .slice(0, 24);
-
-  return `sticky-${hash}`;
-}
-
-async function openStickyWindow(path: string) {
-  const label = await windowLabelForPath(path);
-  const existingWindow = await WebviewWindow.getByLabel(label);
-
-  if (existingWindow) {
-    await existingWindow.setFocus();
-    return;
-  }
-
-  const stickyWindow = new WebviewWindow(label, {
+function openStickyWindow(path: string) {
+  new WebviewWindow(`sticky-${crypto.randomUUID()}`, {
     url: `index.html?path=${encodeURIComponent(path)}`,
     title: fileName(path),
     width: DEFAULT_PETARI_METADATA.width,
@@ -59,273 +33,136 @@ async function openStickyWindow(path: string) {
     decorations: false,
     resizable: true,
   });
-
-  stickyWindow.once("tauri://error", ({ payload }) => {
-    console.error("Failed to create sticky window", payload);
-  });
 }
 
 function App() {
   const [sticky, setSticky] = useState<OpenSticky | null>(null);
   const stickyRef = useRef<OpenSticky | null>(null);
-  const saveTimerRef = useRef<number | null>(null);
-  const closingRef = useRef(false);
+  const saveTimer = useRef<number | null>(null);
 
-  const clearScheduledPersist = () => {
-    if (saveTimerRef.current === null) return;
-
-    window.clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = null;
-  };
-
-  const persistNow = async () => {
+  const persist = () => {
     const current = stickyRef.current;
     if (!current) return;
 
-    await writeTextFile(
+    void writeTextFile(
       current.path,
       serializeStickyDocument(current.document),
     );
   };
 
   const schedulePersist = () => {
-    clearScheduledPersist();
-
-    saveTimerRef.current = window.setTimeout(() => {
-      saveTimerRef.current = null;
-      void persistNow();
-    }, SAVE_DELAY_MS);
+    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(persist, 250);
   };
 
-  const flushAndDestroy = async () => {
-    if (closingRef.current) return;
-    closingRef.current = true;
+  useEffect(() => {
+    if (!INITIAL_PATH) return;
 
-    clearScheduledPersist();
-    await persistNow();
-    await getCurrentWindow().destroy();
-  };
+    void (async () => {
+      const source = await readTextFile(INITIAL_PATH);
+      const document = parseStickyDocument(source);
+      const appWindow = getCurrentWindow();
 
-  const loadMarkdown = async (path: string) => {
-    const source = await readTextFile(path);
-    const document = parseStickyDocument(source);
+      await appWindow.setPosition(new PhysicalPosition(document.petari.x, document.petari.y));
+      await appWindow.setSize(new PhysicalSize(document.petari.width, document.petari.height));
+      await appWindow.setAlwaysOnTop(document.petari.alwaysOnTop);
+
+      const next = { path: INITIAL_PATH, document };
+      stickyRef.current = next;
+      setSticky(next);
+    })();
+  }, []);
+
+  useEffect(() => {
     const appWindow = getCurrentWindow();
+    const listeners = Promise.all([
+      appWindow.onMoved(({ payload }) => {
+        if (!stickyRef.current) return;
+        stickyRef.current.document.petari.x = payload.x;
+        stickyRef.current.document.petari.y = payload.y;
+        schedulePersist();
+      }),
+      appWindow.onResized(({ payload }) => {
+        if (!stickyRef.current) return;
+        stickyRef.current.document.petari.width = payload.width;
+        stickyRef.current.document.petari.height = payload.height;
+        schedulePersist();
+      }),
+    ]);
 
-    await appWindow.setPosition(
-      new PhysicalPosition(document.petari.x, document.petari.y),
-    );
-    await appWindow.setSize(
-      new PhysicalSize(document.petari.width, document.petari.height),
-    );
-    await appWindow.setAlwaysOnTop(document.petari.alwaysOnTop);
-
-    const next = { path, document };
-    stickyRef.current = next;
-    setSticky(next);
-  };
-
-  const openMarkdown = async () => {
-    const selected = await open({
-      multiple: false,
-      directory: false,
-      filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
-    });
-
-    if (!selected || Array.isArray(selected)) return;
-    await openStickyWindow(selected);
-  };
-
-  const createMarkdown = async () => {
-    const selected = await save({
-      defaultPath: "note.md",
-      filters: [{ name: "Markdown", extensions: ["md"] }],
-    });
-
-    if (!selected) return;
-
-    const document: StickyDocument = {
-      metadata: {},
-      petari: { ...DEFAULT_PETARI_METADATA },
-      body: "",
+    return () => {
+      void listeners.then((unlisten) => unlisten.forEach((fn) => fn()));
+      if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
     };
-
-    await writeTextFile(selected, serializeStickyDocument(document));
-    await openStickyWindow(selected);
-  };
+  }, []);
 
   const updateBody = (body: string) => {
-    const current = stickyRef.current;
-    if (!current || current.document.body === body) return;
-
-    const next = {
-      ...current,
-      document: {
-        ...current.document,
-        body,
-      },
-    };
-
-    stickyRef.current = next;
-    setSticky(next);
+    if (!stickyRef.current) return;
+    stickyRef.current.document.body = body;
+    setSticky({ ...stickyRef.current });
     schedulePersist();
   };
 
   const toggleAlwaysOnTop = async () => {
-    const current = stickyRef.current;
-    if (!current) return;
-
-    const alwaysOnTop = !current.document.petari.alwaysOnTop;
-    const next = {
-      ...current,
-      document: {
-        ...current.document,
-        petari: {
-          ...current.document.petari,
-          alwaysOnTop,
-        },
-      },
-    };
-
-    stickyRef.current = next;
-    setSticky(next);
-
-    await getCurrentWindow().setAlwaysOnTop(alwaysOnTop);
-    await persistNow();
+    if (!stickyRef.current) return;
+    const value = !stickyRef.current.document.petari.alwaysOnTop;
+    stickyRef.current.document.petari.alwaysOnTop = value;
+    setSticky({ ...stickyRef.current });
+    await getCurrentWindow().setAlwaysOnTop(value);
+    persist();
   };
 
-  useEffect(() => {
-    if (INITIAL_PATH) {
-      void loadMarkdown(INITIAL_PATH);
-    }
-  }, []);
+  const createMarkdown = async () => {
+    const path = await save({ defaultPath: "note.md" });
+    if (!path) return;
 
-  useEffect(() => {
-    let unlistenMoved: UnlistenFn | undefined;
-    let unlistenResized: UnlistenFn | undefined;
-    let unlistenClose: UnlistenFn | undefined;
-
-    const listen = async () => {
-      const appWindow = getCurrentWindow();
-
-      unlistenMoved = await appWindow.onMoved(({ payload }) => {
-        const current = stickyRef.current;
-        if (!current) return;
-
-        current.document.petari.x = payload.x;
-        current.document.petari.y = payload.y;
-        schedulePersist();
-      });
-
-      unlistenResized = await appWindow.onResized(({ payload }) => {
-        const current = stickyRef.current;
-        if (!current) return;
-
-        current.document.petari.width = payload.width;
-        current.document.petari.height = payload.height;
-        schedulePersist();
-      });
-
-      if (INITIAL_PATH) {
-        unlistenClose = await appWindow.onCloseRequested((event) => {
-          event.preventDefault();
-          void flushAndDestroy();
-        });
-      }
-    };
-
-    void listen();
-
-    return () => {
-      unlistenMoved?.();
-      unlistenResized?.();
-      unlistenClose?.();
-      clearScheduledPersist();
-    };
-  }, []);
-
-  if (!sticky && INITIAL_PATH) {
-    return (
-      <main className="sticky">
-        <header className="sticky__titlebar" data-tauri-drag-region>
-          <span className="sticky__title" data-tauri-drag-region>
-            {fileName(INITIAL_PATH)}
-          </span>
-          <button
-            className="icon-button"
-            type="button"
-            aria-label="Close sticky"
-            onClick={flushAndDestroy}
-          >
-            ×
-          </button>
-        </header>
-        <section className="launcher__content">Loading…</section>
-      </main>
+    await writeTextFile(
+      path,
+      serializeStickyDocument({
+        metadata: {},
+        petari: { ...DEFAULT_PETARI_METADATA },
+        body: "",
+      }),
     );
-  }
+    openStickyWindow(path);
+  };
+
+  const openMarkdown = async () => {
+    const path = await open({
+      multiple: false,
+      filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
+    });
+    if (typeof path === "string") openStickyWindow(path);
+  };
 
   if (!sticky) {
     return (
       <main className="sticky launcher">
-        <header className="sticky__titlebar" data-tauri-drag-region>
-          <span data-tauri-drag-region>Petari</span>
-          <button
-            className="icon-button"
-            type="button"
-            aria-label="Close Petari"
-            onClick={flushAndDestroy}
-          >
-            ×
-          </button>
-        </header>
-
+        <header className="sticky__titlebar" data-tauri-drag-region>Petari</header>
         <section className="launcher__content">
           <strong>Markdown stickies for your desktop.</strong>
           <div className="launcher__actions">
-            <button className="primary-button" type="button" onClick={createMarkdown}>
-              New sticky
-            </button>
-            <button className="secondary-button" type="button" onClick={openMarkdown}>
-              Open Markdown
-            </button>
+            <button className="primary-button" onClick={createMarkdown}>New sticky</button>
+            <button className="secondary-button" onClick={openMarkdown}>Open Markdown</button>
           </div>
         </section>
       </main>
     );
   }
 
-  const title =
-    typeof sticky.document.metadata.title === "string"
-      ? sticky.document.metadata.title
-      : fileName(sticky.path);
+  const title = typeof sticky.document.metadata.title === "string"
+    ? sticky.document.metadata.title
+    : fileName(sticky.path);
 
   return (
     <main className="sticky">
       <header className="sticky__titlebar" data-tauri-drag-region>
-        <span className="sticky__title" data-tauri-drag-region>
-          {title}
-        </span>
+        <span data-tauri-drag-region>{title}</span>
         <div className="sticky__actions">
-          <button
-            className={`icon-button ${sticky.document.petari.alwaysOnTop ? "is-active" : ""}`}
-            type="button"
-            title="Always on top"
-            aria-label="Toggle always on top"
-            onClick={toggleAlwaysOnTop}
-          >
-            ●
-          </button>
-          <button
-            className="icon-button"
-            type="button"
-            aria-label="Close sticky"
-            onClick={flushAndDestroy}
-          >
-            ×
-          </button>
+          <button className="icon-button" onClick={toggleAlwaysOnTop}>●</button>
+          <button className="icon-button" onClick={() => getCurrentWindow().close()}>×</button>
         </div>
       </header>
-
       <StickyEditor markdown={sticky.document.body} onChange={updateBody} />
     </main>
   );

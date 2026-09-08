@@ -22,34 +22,10 @@ export const DEFAULT_PETARI_METADATA: PetariMetadata = {
   alwaysOnTop: false,
 };
 
-const FRONTMATTER_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function finiteNumber(value: unknown, fallback: number): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
-}
-
-function booleanValue(value: unknown, fallback: boolean): boolean {
-  return typeof value === "boolean" ? value : fallback;
-}
-
-function normalizePetariMetadata(value: unknown): PetariMetadata {
-  const raw = isRecord(value) ? value : {};
-
-  return {
-    x: finiteNumber(raw.x, DEFAULT_PETARI_METADATA.x),
-    y: finiteNumber(raw.y, DEFAULT_PETARI_METADATA.y),
-    width: finiteNumber(raw.width, DEFAULT_PETARI_METADATA.width),
-    height: finiteNumber(raw.height, DEFAULT_PETARI_METADATA.height),
-    alwaysOnTop: booleanValue(raw.alwaysOnTop, DEFAULT_PETARI_METADATA.alwaysOnTop),
-  };
-}
+const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/;
 
 export function parseStickyDocument(source: string): StickyDocument {
-  const match = source.match(FRONTMATTER_PATTERN);
+  const match = source.match(FRONTMATTER);
 
   if (!match) {
     return {
@@ -59,23 +35,24 @@ export function parseStickyDocument(source: string): StickyDocument {
     };
   }
 
-  const parsed = parse(match[1]);
-  const metadata = isRecord(parsed) ? parsed : {};
+  const metadata = (parse(match[1]) ?? {}) as Record<string, unknown>;
+  const petari = {
+    ...DEFAULT_PETARI_METADATA,
+    ...(metadata.petari as Partial<PetariMetadata> | undefined),
+  };
 
   return {
     metadata,
-    petari: normalizePetariMetadata(metadata.petari),
+    petari,
     body: source.slice(match[0].length),
   };
 }
 
 export function serializeStickyDocument(document: StickyDocument): string {
-  const metadata = {
+  const frontmatter = stringify({
     ...document.metadata,
     petari: document.petari,
-  };
-
-  const frontmatter = stringify(metadata).trimEnd();
+  }).trimEnd();
 
   return `---\n${frontmatter}\n---\n${document.body}`;
 }
