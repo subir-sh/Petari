@@ -169,16 +169,32 @@ button {
   padding: 24px;
 }
 
-.primary-button {
+.launcher__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.primary-button,
+.secondary-button {
   min-height: 36px;
   border: 1px solid rgb(0 0 0 / 18%);
   border-radius: 6px;
   padding: 0 12px;
-  background: rgb(255 255 255 / 35%);
   cursor: pointer;
 }
 
+.primary-button {
+  background: rgb(255 255 255 / 55%);
+}
+
+.secondary-button {
+  background: transparent;
+}
+
 .primary-button:hover,
-.primary-button:focus-visible {
-  background: rgb(255 255 255 / 60%);
+.primary-button:focus-visible,
+.secondary-button:hover,
+.secondary-button:focus-visible {
+  background: rgb(255 255 255 / 75%);
 }

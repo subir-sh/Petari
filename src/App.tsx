@@ -6,10 +6,11 @@ import {
   PhysicalSize,
 } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import StickyEditor from "./components/StickyEditor";
 import {
+  DEFAULT_PETARI_METADATA,
   parseStickyDocument,
   serializeStickyDocument,
   type StickyDocument,
@@ -25,6 +26,24 @@ type OpenSticky = {
 
 function fileName(path: string): string {
   return path.split(/[\\/]/).pop() ?? path;
+}
+
+function openStickyWindow(path: string) {
+  const label = `sticky-${crypto.randomUUID()}`;
+  const stickyWindow = new WebviewWindow(label, {
+    url: `index.html?path=${encodeURIComponent(path)}`,
+    title: fileName(path),
+    width: DEFAULT_PETARI_METADATA.width,
+    height: DEFAULT_PETARI_METADATA.height,
+    minWidth: 240,
+    minHeight: 180,
+    decorations: false,
+    resizable: true,
+  });
+
+  stickyWindow.once("tauri://error", ({ payload }) => {
+    console.error("Failed to create sticky window", payload);
+  });
 }
 
 function App() {
@@ -79,22 +98,25 @@ function App() {
     });
 
     if (!selected || Array.isArray(selected)) return;
+    openStickyWindow(selected);
+  };
 
-    const label = `sticky-${crypto.randomUUID()}`;
-    const stickyWindow = new WebviewWindow(label, {
-      url: `index.html?path=${encodeURIComponent(selected)}`,
-      title: fileName(selected),
-      width: 340,
-      height: 360,
-      minWidth: 240,
-      minHeight: 180,
-      decorations: false,
-      resizable: true,
+  const createMarkdown = async () => {
+    const selected = await save({
+      defaultPath: "note.md",
+      filters: [{ name: "Markdown", extensions: ["md"] }],
     });
 
-    stickyWindow.once("tauri://error", ({ payload }) => {
-      console.error("Failed to create sticky window", payload);
-    });
+    if (!selected) return;
+
+    const document: StickyDocument = {
+      metadata: {},
+      petari: { ...DEFAULT_PETARI_METADATA },
+      body: "",
+    };
+
+    await writeTextFile(selected, serializeStickyDocument(document));
+    openStickyWindow(selected);
   };
 
   const updateBody = (body: string) => {
@@ -224,9 +246,14 @@ function App() {
 
         <section className="launcher__content">
           <strong>Markdown stickies for your desktop.</strong>
-          <button className="primary-button" type="button" onClick={openMarkdown}>
-            Open Markdown file
-          </button>
+          <div className="launcher__actions">
+            <button className="primary-button" type="button" onClick={createMarkdown}>
+              New sticky
+            </button>
+            <button className="secondary-button" type="button" onClick={openMarkdown}>
+              Open Markdown
+            </button>
+          </div>
         </section>
       </main>
     );
