@@ -8,6 +8,7 @@ import {
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import StickyEditor from "./components/StickyEditor";
 import {
   parseStickyDocument,
   serializeStickyDocument,
@@ -98,7 +99,7 @@ function App() {
 
   const updateBody = (body: string) => {
     const current = stickyRef.current;
-    if (!current) return;
+    if (!current || current.document.body === body) return;
 
     const next = {
       ...current,
@@ -263,13 +264,7 @@ function App() {
         </div>
       </header>
 
-      <textarea
-        className="sticky__editor"
-        aria-label="Markdown note"
-        value={sticky.document.body}
-        onChange={(event) => updateBody(event.target.value)}
-        spellCheck={false}
-      />
+      <StickyEditor markdown={sticky.document.body} onChange={updateBody} />
     </main>
   );
 }

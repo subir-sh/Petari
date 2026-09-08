@@ -19,12 +19,8 @@ body {
   background: #fff4b8;
 }
 
-button,
-textarea {
-  font: inherit;
-}
-
 button {
+  font: inherit;
   color: inherit;
 }
 
@@ -60,30 +56,106 @@ button {
   align-self: stretch;
 }
 
-.icon-button {
-  width: 34px;
+.icon-button,
+.format-button {
   border: 0;
   background: transparent;
   cursor: pointer;
 }
 
+.icon-button {
+  width: 34px;
+}
+
 .icon-button:hover,
 .icon-button:focus-visible,
-.icon-button.is-active {
+.icon-button.is-active,
+.format-button:hover,
+.format-button:focus-visible,
+.format-button.is-active {
   background: rgb(0 0 0 / 8%);
+}
+
+.sticky__editor-shell {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.sticky__toolbar {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  border-bottom: 1px solid rgb(0 0 0 / 7%);
+}
+
+.format-button {
+  width: 28px;
+  height: 24px;
+  border-radius: 4px;
+  font-size: 12px;
 }
 
 .sticky__editor {
   min-height: 0;
   flex: 1;
-  width: 100%;
-  resize: none;
-  border: 0;
-  outline: 0;
-  padding: 16px;
-  color: inherit;
-  background: transparent;
-  font: 14px/1.55 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  overflow: auto;
+}
+
+.sticky__editor-content {
+  min-height: 100%;
+  padding: 14px 16px 24px;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.sticky__editor-content > :first-child {
+  margin-top: 0;
+}
+
+.sticky__editor-content > :last-child {
+  margin-bottom: 0;
+}
+
+.sticky__editor-content p,
+.sticky__editor-content ul,
+.sticky__editor-content ol,
+.sticky__editor-content blockquote,
+.sticky__editor-content pre {
+  margin: 0 0 0.7em;
+}
+
+.sticky__editor-content h1,
+.sticky__editor-content h2,
+.sticky__editor-content h3 {
+  margin: 0.8em 0 0.35em;
+  line-height: 1.25;
+}
+
+.sticky__editor-content h1 {
+  font-size: 1.35em;
+}
+
+.sticky__editor-content h2 {
+  font-size: 1.2em;
+}
+
+.sticky__editor-content h3 {
+  font-size: 1.08em;
+}
+
+.sticky__editor-content ul,
+.sticky__editor-content ol {
+  padding-left: 1.4em;
+}
+
+.sticky__editor-content code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.92em;
 }
 
 .launcher__content {
