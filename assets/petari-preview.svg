@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+  <defs>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000" flood-opacity="0.18"/>
+    </filter>
+    <style>
+      .ui { font-family: "Segoe UI", Arial, sans-serif; fill: #252525; }
+      .small { font-size: 12px; font-weight: 600; }
+      .body { font-size: 14px; }
+      .muted { fill: #666; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="720" fill="#eef1f4"/>
+
+  <!-- Sticky 1 -->
+  <g filter="url(#shadow)">
+    <rect x="70" y="68" width="340" height="360" fill="#fff4b8"/>
+    <line x1="70" y1="102" x2="410" y2="102" stroke="#000" stroke-opacity="0.08"/>
+  </g>
+  <g class="ui small">
+    <text x="80" y="90">1</text><text x="126" y="90">B</text><text x="154" y="90">S̶</text><text x="184" y="90">•</text><text x="212" y="90">1.</text><text x="242" y="90">☑</text>
+    <circle cx="270" cy="84" r="6" fill="#f6d95d" stroke="#000" stroke-opacity="0.18"/>
+    <line x1="292" y1="74" x2="292" y2="94" stroke="#000" stroke-opacity="0.12"/>
+    <text x="307" y="90">☷</text><text x="337" y="90">+</text><text x="366" y="90">○</text><text x="394" y="90">×</text>
+  </g>
+  <g class="ui body">
+    <text x="86" y="132" font-weight="700">오늘 할 일</text>
+    <rect x="89" y="150" width="11" height="11" rx="2" fill="#1677ff"/><path d="M91 155 l3 3 5 -6" fill="none" stroke="#fff" stroke-width="1.5"/>
+    <text x="108" y="160" class="muted" text-decoration="line-through">메일 확인하기</text>
+    <rect x="89" y="178" width="11" height="11" rx="2" fill="#fff" stroke="#777"/><text x="108" y="188">회의 준비하기</text>
+    <rect x="89" y="206" width="11" height="11" rx="2" fill="#fff" stroke="#777"/><text x="108" y="216">문서 정리하기</text>
+    <text x="86" y="247">생각나는 내용은 그냥 바로 적어두기.</text>
+  </g>
+
+  <!-- Sticky 2 -->
+  <g filter="url(#shadow)">
+    <rect x="362" y="205" width="330" height="300" fill="#dcecff"/>
+    <line x1="362" y1="239" x2="692" y2="239" stroke="#000" stroke-opacity="0.08"/>
+  </g>
+  <g class="ui small">
+    <text x="372" y="227">2</text><text x="408" y="227">B</text><text x="436" y="227">S̶</text><text x="466" y="227">•</text><text x="494" y="227">1.</text><text x="524" y="227">☑</text>
+    <circle cx="552" cy="221" r="6" fill="#8fc1ff" stroke="#000" stroke-opacity="0.18"/>
+    <line x1="574" y1="211" x2="574" y2="231" stroke="#000" stroke-opacity="0.12"/>
+    <text x="589" y="227">☷</text><text x="619" y="227">+</text><text x="648" y="227">●</text><text x="676" y="227">×</text>
+  </g>
+  <g class="ui body">
+    <text x="378" y="269" font-weight="700">아이디어</text>
+    <text x="382" y="303">•  작게 시작하기</text><text x="382" y="326">•  한 화면에 필요한 것만</text><text x="382" y="349">•  마크다운 파일 그대로 저장</text>
+  </g>
+
+  <!-- Sticky 3 -->
+  <g filter="url(#shadow)">
+    <rect x="620" y="82" width="300" height="270" fill="#f8dce7"/>
+    <line x1="620" y1="116" x2="920" y2="116" stroke="#000" stroke-opacity="0.08"/>
+  </g>
+  <g class="ui small">
+    <text x="630" y="104">3</text><text x="660" y="104">B</text><text x="688" y="104">S̶</text><text x="718" y="104">•</text><text x="746" y="104">1.</text><text x="776" y="104">☑</text>
+    <circle cx="804" cy="98" r="6" fill="#e9a1bc" stroke="#000" stroke-opacity="0.18"/>
+    <line x1="826" y1="88" x2="826" y2="108" stroke="#000" stroke-opacity="0.12"/>
+    <text x="841" y="104">☷</text><text x="871" y="104">+</text><text x="900" y="104">○</text>
+  </g>
+  <g class="ui body">
+    <text x="636" y="146" font-weight="700">회의 메모</text>
+    <text x="638" y="177">1. 핵심 이슈 확인</text><text x="638" y="200">2. 다음 액션 결정</text>
+    <text x="636" y="233">중요한 문장은</text><text x="737" y="233" font-weight="700">굵게</text><text x="765" y="233">표시.</text>
+  </g>
+
+  <!-- List window -->
+  <g filter="url(#shadow)"><rect x="826" y="294" width="320" height="330" fill="#f7f7f7"/></g>
+  <line x1="826" y1="328" x2="1146" y2="328" stroke="#000" stroke-opacity="0.08"/>
+  <g class="ui small"><text x="838" y="316" font-weight="700">Petari</text><text x="1129" y="316">×</text></g>
+  <g class="ui body">
+    <text x="838" y="357" font-weight="700">1</text><text x="872" y="357" class="muted">오늘 할 일</text>
+    <line x1="826" y1="372" x2="1146" y2="372" stroke="#000" stroke-opacity="0.07"/>
+    <text x="838" y="401" font-weight="700">2</text><text x="872" y="401" class="muted">아이디어</text>
+    <line x1="826" y1="416" x2="1146" y2="416" stroke="#000" stroke-opacity="0.07"/>
+    <text x="838" y="445" font-weight="700">3</text><text x="872" y="445" class="muted">회의 메모</text>
+    <line x1="826" y1="460" x2="1146" y2="460" stroke="#000" stroke-opacity="0.07"/>
+    <text x="838" y="489" font-weight="700">4</text><text x="872" y="489" class="muted">Empty note</text>
+  </g>
+  <line x1="826" y1="572" x2="1146" y2="572" stroke="#000" stroke-opacity="0.08"/>
+  <rect x="836" y="583" width="145" height="31" rx="5" fill="#fff" stroke="#000" stroke-opacity="0.12"/>
+  <rect x="990" y="583" width="145" height="31" rx="5" fill="#fff" stroke="#000" stroke-opacity="0.12"/>
+  <g class="ui" font-size="13"><text x="870" y="603">+ New sticky</text><text x="1022" y="603">Quit Petari</text></g>
+
+  <text x="40" y="690" class="ui" font-size="13" fill="#6b7280">현재 Petari UI 구조를 실제 스타일 기준으로 렌더링한 예시</text>
+</svg>
