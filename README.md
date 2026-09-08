@@ -13,39 +13,30 @@ git pull
 
 `Petari.exe` is kept in the repository root. When the source changes, GitHub Actions rebuilds the Windows executable and commits the new binary back to the repository.
 
-On first launch Petari creates and opens:
+On first launch Petari creates the first sticky automatically. New stickies are created instantly with `+`; there is no Save As dialog.
 
-```text
-Documents/Petari/note.md
-```
+Internally the files are stored under `Documents/Petari` as `1.md`, `2.md`, `3.md`, and so on. The UI only shows the sticky number, not the file extension or storage path.
 
 ## Concept
 
 One Markdown file is one sticky window.
 
-```text
-notes/
-├─ today.md
-├─ ideas.md
-└─ project-a.md
-```
-
 The Markdown file stores both content and Petari-specific window state.
 
 ```md
 ---
-title: Today
 petari:
   x: 420
   y: 180
   width: 320
   height: 260
   alwaysOnTop: false
+  color: yellow
 ---
 
-- ~~Finished task~~
+- [ ] Checklist item
 - **Important task**
-- Another task
+- ~~Finished task~~
 ```
 
 Petari metadata lives under the `petari` namespace so normal Markdown frontmatter can coexist with it.
@@ -75,9 +66,14 @@ Petari metadata lives under the `petari` namespace so normal Markdown frontmatte
 ## Current MVP
 
 - Launch directly as a frameless sticky window
-- Create/open Markdown stickies
+- `+` creates a new sticky immediately
 - WYSIWYG Markdown editing
 - Bold and strikethrough
+- Bullet and numbered lists
+- Checklists stored as `- [ ]` / `- [x]`
+- List indentation with normal editor keyboard shortcuts
+- Undo/redo and standard formatting shortcuts such as `Ctrl+B`
+- Five sticky colors stored in `petari.color`
 - Drag and resize native windows
 - Restore and save position/size through `petari` frontmatter
 - Always-on-top toggle

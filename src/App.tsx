@@ -6,6 +6,7 @@ import { mkdir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import StickyEditor, { type StickyEditorHandle } from "./components/StickyEditor";
 import {
   DEFAULT_PETARI_METADATA,
+  PETARI_COLORS,
   parseStickyDocument,
   serializeStickyDocument,
   type StickyDocument,
@@ -69,7 +70,7 @@ function openStickyWindow(path: string) {
     title: stickyNumber(path),
     width: DEFAULT_PETARI_METADATA.width,
     height: DEFAULT_PETARI_METADATA.height,
-    minWidth: 240,
+    minWidth: 280,
     minHeight: 180,
     decorations: false,
     resizable: true,
@@ -150,6 +151,15 @@ function App() {
     persist();
   };
 
+  const cycleColor = () => {
+    if (!stickyRef.current) return;
+    const current = stickyRef.current.document.petari.color;
+    const next = PETARI_COLORS[(PETARI_COLORS.indexOf(current) + 1) % PETARI_COLORS.length];
+    stickyRef.current.document.petari.color = next;
+    setSticky({ ...stickyRef.current });
+    persist();
+  };
+
   const createSticky = async () => {
     const path = await nextStickyPath();
     await writeTextFile(path, serializeStickyDocument(emptyDocument()));
@@ -159,30 +169,33 @@ function App() {
   if (!sticky) return <main className="sticky" />;
 
   return (
-    <main className="sticky">
+    <main className={`sticky sticky--${sticky.document.petari.color}`}>
       <header className="sticky__titlebar" data-tauri-drag-region>
         <span className="sticky__title" data-tauri-drag-region>{stickyNumber(sticky.path)}</span>
         <div className="sticky__actions">
           <button className="icon-button" title="New sticky" onClick={createSticky}>+</button>
-          <button
-            className="icon-button"
-            title="Bold"
-            onMouseDown={(event) => {
-              event.preventDefault();
-              editorRef.current?.toggleBold();
-            }}
-          >
-            <strong>B</strong>
-          </button>
-          <button
-            className="icon-button"
-            title="Strikethrough"
-            onMouseDown={(event) => {
-              event.preventDefault();
-              editorRef.current?.toggleStrike();
-            }}
-          >
-            <s>S</s>
+          <button className="icon-button" title="Bold" onMouseDown={(event) => {
+            event.preventDefault();
+            editorRef.current?.toggleBold();
+          }}><strong>B</strong></button>
+          <button className="icon-button" title="Strikethrough" onMouseDown={(event) => {
+            event.preventDefault();
+            editorRef.current?.toggleStrike();
+          }}><s>S</s></button>
+          <button className="icon-button" title="Bullet list" onMouseDown={(event) => {
+            event.preventDefault();
+            editorRef.current?.toggleBulletList();
+          }}>•</button>
+          <button className="icon-button icon-button--small-text" title="Numbered list" onMouseDown={(event) => {
+            event.preventDefault();
+            editorRef.current?.toggleOrderedList();
+          }}>1.</button>
+          <button className="icon-button" title="Checklist" onMouseDown={(event) => {
+            event.preventDefault();
+            editorRef.current?.toggleTaskList();
+          }}>☑</button>
+          <button className="icon-button" title="Change color" onClick={cycleColor}>
+            <span className={`color-dot color-dot--${sticky.document.petari.color}`} />
           </button>
           <button className="icon-button" title="Always on top" onClick={toggleAlwaysOnTop}>
             {sticky.document.petari.alwaysOnTop ? "●" : "○"}

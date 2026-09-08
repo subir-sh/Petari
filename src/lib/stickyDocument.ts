@@ -1,11 +1,15 @@
 import { parse, stringify } from "yaml";
 
+export const PETARI_COLORS = ["yellow", "blue", "green", "pink", "gray"] as const;
+export type PetariColor = (typeof PETARI_COLORS)[number];
+
 export type PetariMetadata = {
   x: number;
   y: number;
   width: number;
   height: number;
   alwaysOnTop: boolean;
+  color: PetariColor;
 };
 
 export type StickyDocument = {
@@ -20,6 +24,7 @@ export const DEFAULT_PETARI_METADATA: PetariMetadata = {
   width: 340,
   height: 360,
   alwaysOnTop: false,
+  color: "yellow",
 };
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/;

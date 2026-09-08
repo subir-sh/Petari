@@ -1,6 +1,7 @@
 import { forwardRef, useImperativeHandle } from "react";
-import { EditorContent, useEditor } from "@tiptap/react";
+import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { Markdown } from "@tiptap/markdown";
+import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 
 type Props = {
@@ -11,6 +12,9 @@ type Props = {
 export type StickyEditorHandle = {
   toggleBold: () => void;
   toggleStrike: () => void;
+  toggleBulletList: () => void;
+  toggleOrderedList: () => void;
+  toggleTaskList: () => void;
 };
 
 const StickyEditor = forwardRef<StickyEditorHandle, Props>(function StickyEditor(
@@ -18,7 +22,12 @@ const StickyEditor = forwardRef<StickyEditorHandle, Props>(function StickyEditor
   ref,
 ) {
   const editor = useEditor({
-    extensions: [StarterKit, Markdown],
+    extensions: [
+      StarterKit,
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      Markdown.configure({ markedOptions: { gfm: true } }),
+    ],
     content: markdown,
     contentType: "markdown",
     editorProps: {
@@ -30,6 +39,9 @@ const StickyEditor = forwardRef<StickyEditorHandle, Props>(function StickyEditor
   useImperativeHandle(ref, () => ({
     toggleBold: () => editor?.chain().focus().toggleBold().run(),
     toggleStrike: () => editor?.chain().focus().toggleStrike().run(),
+    toggleBulletList: () => editor?.chain().focus().toggleBulletList().run(),
+    toggleOrderedList: () => editor?.chain().focus().toggleOrderedList().run(),
+    toggleTaskList: () => editor?.chain().focus().toggleTaskList().run(),
   }));
 
   return (
