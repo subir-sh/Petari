@@ -56,21 +56,15 @@ button {
   align-self: stretch;
 }
 
-.icon-button,
-.format-button {
+.icon-button {
+  width: 34px;
   border: 0;
   background: transparent;
   cursor: pointer;
 }
 
-.icon-button {
-  width: 34px;
-}
-
 .icon-button:hover,
-.icon-button:focus-visible,
-.format-button:hover,
-.format-button:focus-visible {
+.icon-button:focus-visible {
   background: rgb(0 0 0 / 8%);
 }
 
@@ -79,22 +73,6 @@ button {
   min-height: 0;
   flex: 1;
   flex-direction: column;
-}
-
-.sticky__toolbar {
-  display: flex;
-  min-height: 30px;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 8px;
-  border-bottom: 1px solid rgb(0 0 0 / 7%);
-}
-
-.format-button {
-  width: 28px;
-  height: 24px;
-  border-radius: 4px;
-  font-size: 12px;
 }
 
 .sticky__editor {

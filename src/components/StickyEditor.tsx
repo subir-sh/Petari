@@ -1,3 +1,4 @@
+import { forwardRef, useImperativeHandle } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { Markdown } from "@tiptap/markdown";
 import StarterKit from "@tiptap/starter-kit";
@@ -7,7 +8,15 @@ type Props = {
   onChange: (markdown: string) => void;
 };
 
-function StickyEditor({ markdown, onChange }: Props) {
+export type StickyEditorHandle = {
+  toggleBold: () => void;
+  toggleStrike: () => void;
+};
+
+const StickyEditor = forwardRef<StickyEditorHandle, Props>(function StickyEditor(
+  { markdown, onChange },
+  ref,
+) {
   const editor = useEditor({
     extensions: [StarterKit, Markdown],
     content: markdown,
@@ -18,33 +27,16 @@ function StickyEditor({ markdown, onChange }: Props) {
     onUpdate: ({ editor }) => onChange(editor.getMarkdown()),
   });
 
+  useImperativeHandle(ref, () => ({
+    toggleBold: () => editor?.chain().focus().toggleBold().run(),
+    toggleStrike: () => editor?.chain().focus().toggleStrike().run(),
+  }));
+
   return (
     <section className="sticky__editor-shell">
-      <div className="sticky__toolbar">
-        <button
-          className="format-button"
-          type="button"
-          onMouseDown={(event) => {
-            event.preventDefault();
-            editor?.chain().focus().toggleBold().run();
-          }}
-        >
-          <strong>B</strong>
-        </button>
-        <button
-          className="format-button"
-          type="button"
-          onMouseDown={(event) => {
-            event.preventDefault();
-            editor?.chain().focus().toggleStrike().run();
-          }}
-        >
-          <s>S</s>
-        </button>
-      </div>
       <EditorContent className="sticky__editor" editor={editor} />
     </section>
   );
-}
+});
 
 export default StickyEditor;
