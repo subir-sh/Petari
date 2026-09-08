@@ -28,8 +28,27 @@ function fileName(path: string): string {
   return path.split(/[\\/]/).pop() ?? path;
 }
 
-function openStickyWindow(path: string) {
-  const label = `sticky-${crypto.randomUUID()}`;
+async function windowLabelForPath(path: string): Promise<string> {
+  const input = new TextEncoder().encode(path);
+  const digest = await crypto.subtle.digest("SHA-256", input);
+  const hash = Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  )
+    .join("")
+    .slice(0, 24);
+
+  return `sticky-${hash}`;
+}
+
+async function openStickyWindow(path: string) {
+  const label = await windowLabelForPath(path);
+  const existingWindow = await WebviewWindow.getByLabel(label);
+
+  if (existingWindow) {
+    await existingWindow.setFocus();
+    return;
+  }
+
   const stickyWindow = new WebviewWindow(label, {
     url: `index.html?path=${encodeURIComponent(path)}`,
     title: fileName(path),
@@ -113,7 +132,7 @@ function App() {
     });
 
     if (!selected || Array.isArray(selected)) return;
-    openStickyWindow(selected);
+    await openStickyWindow(selected);
   };
 
   const createMarkdown = async () => {
@@ -131,7 +150,7 @@ function App() {
     };
 
     await writeTextFile(selected, serializeStickyDocument(document));
-    openStickyWindow(selected);
+    await openStickyWindow(selected);
   };
 
   const updateBody = (body: string) => {
