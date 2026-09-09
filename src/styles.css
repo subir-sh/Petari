@@ -189,23 +189,32 @@ input {
 }
 
 .sticky__editor-content li[data-type="taskItem"] {
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
   gap: 6px;
 }
 
 .sticky__editor-content li[data-type="taskItem"] > label {
-  margin-top: 2px;
+  display: flex;
+  height: 1.55em;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
   user-select: none;
 }
 
 .sticky__editor-content li[data-type="taskItem"] > label input {
+  margin: 0;
   cursor: pointer;
 }
 
 .sticky__editor-content li[data-type="taskItem"] > div {
   min-width: 0;
-  flex: 1;
+}
+
+.sticky__editor-content li[data-type="taskItem"] > div > :first-child {
+  margin-top: 0;
 }
 
 .sticky__editor-content h1,

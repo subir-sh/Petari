@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { documentDir, join } from "@tauri-apps/api/path";
-import { getCurrentWindow, PhysicalPosition, PhysicalSize } from "@tauri-apps/api/window";
+import {
+  availableMonitors,
+  getCurrentWindow,
+  PhysicalPosition,
+  PhysicalSize,
+  primaryMonitor,
+} from "@tauri-apps/api/window";
 import { WebviewWindow, getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { mkdir, readDir, readTextFile, remove, writeTextFile } from "@tauri-apps/plugin-fs";
 import StickyEditor, { type StickyEditorHandle } from "./components/StickyEditor";
@@ -23,6 +29,8 @@ type StickyFile = {
   document: StickyDocument;
 };
 
+type MonitorInfo = Awaited<ReturnType<typeof availableMonitors>>[number];
+
 function stickyNumber(path: string) {
   return Number(path.split(/[\\/]/).pop()?.replace(/\.md$/i, "") ?? 0);
 }
@@ -33,6 +41,39 @@ function emptyDocument(overrides: Partial<PetariMetadata> = {}): StickyDocument 
     petari: { ...DEFAULT_PETARI_METADATA, ...overrides },
     body: "",
   };
+}
+
+function safePosition(
+  metadata: PetariMetadata,
+  monitors: MonitorInfo[],
+  fallback: MonitorInfo | null,
+) {
+  const minVisibleWidth = Math.min(metadata.width, 80);
+  const minVisibleHeight = Math.min(metadata.height, 34);
+  const visible = monitors.some(({ workArea }) => {
+    const left = Math.max(metadata.x, workArea.position.x);
+    const top = Math.max(metadata.y, workArea.position.y);
+    const right = Math.min(metadata.x + metadata.width, workArea.position.x + workArea.size.width);
+    const bottom = Math.min(metadata.y + metadata.height, workArea.position.y + workArea.size.height);
+    return right - left >= minVisibleWidth && bottom - top >= minVisibleHeight;
+  });
+
+  if (visible || !fallback) return { x: metadata.x, y: metadata.y, recovered: false };
+
+  const { position, size } = fallback.workArea;
+  const maxX = position.x + Math.max(0, size.width - metadata.width);
+  const maxY = position.y + Math.max(0, size.height - metadata.height);
+  return {
+    x: Math.min(Math.max(metadata.x, position.x), maxX),
+    y: Math.min(Math.max(metadata.y, position.y), maxY),
+    recovered: true,
+  };
+}
+
+async function desktopMonitors() {
+  const monitors = await availableMonitors();
+  const fallback = (await primaryMonitor()) ?? monitors[0] ?? null;
+  return { monitors, fallback };
 }
 
 async function petariDirectory() {
@@ -185,8 +226,20 @@ function ListView() {
   };
 
   const showAll = async () => {
-    const windows = await getAllWebviewWindows();
-    for (const appWindow of windows.filter((value) => value.label.startsWith("sticky-"))) {
+    const { monitors, fallback } = await desktopMonitors();
+    const currentStickies = await loadStickies();
+
+    for (const sticky of currentStickies) {
+      const appWindow = await WebviewWindow.getByLabel(`sticky-${sticky.number}`);
+      if (!appWindow) continue;
+
+      const position = safePosition(sticky.document.petari, monitors, fallback);
+      if (position.recovered) {
+        sticky.document.petari.x = position.x;
+        sticky.document.petari.y = position.y;
+        await writeTextFile(sticky.path, serializeStickyDocument(sticky.document));
+        await appWindow.setPosition(new PhysicalPosition(position.x, position.y));
+      }
       await appWindow.setFocus();
     }
   };
@@ -261,8 +314,16 @@ function StickyView({ path }: { path: string }) {
     void (async () => {
       const document = parseStickyDocument(await readTextFile(path));
       const appWindow = getCurrentWindow();
+      const { monitors, fallback } = await desktopMonitors();
+      const position = safePosition(document.petari, monitors, fallback);
 
-      await appWindow.setPosition(new PhysicalPosition(document.petari.x, document.petari.y));
+      if (position.recovered) {
+        document.petari.x = position.x;
+        document.petari.y = position.y;
+        await writeTextFile(path, serializeStickyDocument(document));
+      }
+
+      await appWindow.setPosition(new PhysicalPosition(position.x, position.y));
       await appWindow.setSize(new PhysicalSize(document.petari.width, document.petari.height));
       await appWindow.setAlwaysOnTop(document.petari.alwaysOnTop);
 
