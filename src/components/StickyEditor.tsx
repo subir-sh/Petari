@@ -25,7 +25,10 @@ const StickyEditor = forwardRef<StickyEditorHandle, Props>(function StickyEditor
     extensions: [
       StarterKit,
       TaskList,
-      TaskItem.configure({ nested: true }),
+      TaskItem.configure({
+        nested: true,
+        HTMLAttributes: { "data-type": "taskItem" },
+      }),
       Markdown.configure({ markedOptions: { gfm: true } }),
     ],
     content: markdown,
