@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { forwardRef, useImperativeHandle } from "react";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { Markdown } from "@tiptap/markdown";
@@ -23,7 +24,9 @@ const StickyEditor = forwardRef<StickyEditorHandle, Props>(function StickyEditor
 ) {
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        link: { openOnClick: false },
+      }),
       TaskList,
       TaskItem.configure({
         nested: true,
@@ -37,6 +40,15 @@ const StickyEditor = forwardRef<StickyEditorHandle, Props>(function StickyEditor
       attributes: {
         class: "sticky__editor-content",
         spellcheck: "false",
+      },
+      handleClick: (_view, _pos, event) => {
+        if (!event.ctrlKey || !(event.target instanceof Element)) return false;
+        const link = event.target.closest("a[href]");
+        if (!(link instanceof HTMLAnchorElement)) return false;
+
+        event.preventDefault();
+        void invoke("open_url", { url: link.href });
+        return true;
       },
     },
     onUpdate: ({ editor }) => onChange(editor.getMarkdown()),

@@ -117,6 +117,7 @@ async function openStickyWindow(path: string, metadata: PetariMetadata) {
   const label = `sticky-${stickyNumber(path)}`;
   const existing = await WebviewWindow.getByLabel(label);
   if (existing) {
+    await existing.unminimize();
     await existing.setFocus();
     return;
   }
@@ -139,6 +140,7 @@ async function openStickyWindow(path: string, metadata: PetariMetadata) {
 async function openListWindow() {
   const existing = await WebviewWindow.getByLabel("list");
   if (existing) {
+    await existing.unminimize();
     await existing.setFocus();
     return;
   }
@@ -199,7 +201,17 @@ function ListView() {
 
   useEffect(() => {
     void reload();
-    const handleFocus = () => void reload();
+    const handleFocus = () => {
+      void (async () => {
+        await reload();
+        const windows = await getAllWebviewWindows();
+        await Promise.all(
+          windows
+            .filter((appWindow) => appWindow.label.startsWith("sticky-"))
+            .map((appWindow) => appWindow.unminimize()),
+        );
+      })();
+    };
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
   }, []);
@@ -233,6 +245,7 @@ function ListView() {
       const appWindow = await WebviewWindow.getByLabel(`sticky-${sticky.number}`);
       if (!appWindow) continue;
 
+      await appWindow.unminimize();
       const position = safePosition(sticky.document.petari, monitors, fallback);
       if (position.recovered) {
         sticky.document.petari.x = position.x;
@@ -442,6 +455,7 @@ function StickyView({ path }: { path: string }) {
           <button className="icon-button sticky__secondary-control" title="Always on top" onClick={toggleAlwaysOnTop}>
             {sticky.document.petari.alwaysOnTop ? "●" : "○"}
           </button>
+          <button className="icon-button sticky__secondary-control" title="Minimize" onClick={() => getCurrentWindow().minimize()}>−</button>
           <button className="icon-button" title="Close" onClick={closeSticky}>×</button>
         </div>
       </header>
