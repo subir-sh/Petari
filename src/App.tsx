@@ -22,6 +22,7 @@ import {
 const params = new URLSearchParams(window.location.search);
 const INITIAL_PATH = params.get("path");
 const IS_LIST = params.has("list");
+const LIST_VISIBLE_KEY = "petari:listVisible";
 
 type StickyFile = {
   path: string;
@@ -138,6 +139,7 @@ async function openStickyWindow(path: string, metadata: PetariMetadata) {
 }
 
 async function openListWindow() {
+  localStorage.setItem(LIST_VISIBLE_KEY, "true");
   const existing = await WebviewWindow.getByLabel("list");
   if (existing) {
     await existing.unminimize();
@@ -196,22 +198,43 @@ function preview(body: string) {
 function ListView() {
   const [stickies, setStickies] = useState<StickyFile[]>([]);
   const [query, setQuery] = useState("");
+  const activatingRef = useRef(false);
 
   const reload = async () => setStickies(await loadStickies());
 
   useEffect(() => {
     void reload();
     const handleFocus = () => {
+      if (activatingRef.current) return;
+      activatingRef.current = true;
+
       void (async () => {
-        await reload();
-        const windows = await getAllWebviewWindows();
-        await Promise.all(
-          windows
-            .filter((appWindow) => appWindow.label.startsWith("sticky-"))
-            .map((appWindow) => appWindow.unminimize()),
-        );
+        try {
+          await reload();
+          const windows = await getAllWebviewWindows();
+          const stickyWindows = windows.filter((appWindow) => appWindow.label.startsWith("sticky-"));
+
+          for (const appWindow of stickyWindows) {
+            await appWindow.unminimize();
+            await appWindow.setFocus();
+          }
+
+          const listWindow = getCurrentWindow();
+          const keepListVisible = localStorage.getItem(LIST_VISIBLE_KEY) !== "false" || stickyWindows.length === 0;
+          if (keepListVisible) {
+            localStorage.setItem(LIST_VISIBLE_KEY, "true");
+            await listWindow.setFocus();
+          } else {
+            await listWindow.minimize();
+          }
+        } finally {
+          window.setTimeout(() => {
+            activatingRef.current = false;
+          }, 50);
+        }
       })();
     };
+
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
   }, []);
@@ -257,6 +280,11 @@ function ListView() {
     }
   };
 
+  const hideList = async () => {
+    localStorage.setItem(LIST_VISIBLE_KEY, "false");
+    await getCurrentWindow().minimize();
+  };
+
   const quit = async () => {
     const windows = await getAllWebviewWindows();
     await Promise.all(windows.map((appWindow) => appWindow.destroy()));
@@ -273,7 +301,7 @@ function ListView() {
     <main className="note-list">
       <header className="note-list__titlebar" data-tauri-drag-region>
         <span className="note-list__title" data-tauri-drag-region>Petari</span>
-        <button className="icon-button" title="Minimize" onClick={() => getCurrentWindow().minimize()}>×</button>
+        <button className="icon-button" title="Close list" onClick={hideList}>×</button>
       </header>
 
       <div className="note-list__search">
@@ -372,7 +400,6 @@ function StickyView({ path }: { path: string }) {
   const updateBody = (body: string) => {
     if (!stickyRef.current) return;
     stickyRef.current.document.body = body;
-    setSticky({ ...stickyRef.current });
     schedulePersist();
   };
 
