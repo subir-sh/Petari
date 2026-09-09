@@ -31,7 +31,10 @@ const StickyEditor = forwardRef<StickyEditorHandle, Props>(function StickyEditor
     content: markdown,
     contentType: "markdown",
     editorProps: {
-      attributes: { class: "sticky__editor-content" },
+      attributes: {
+        class: "sticky__editor-content",
+        spellcheck: "false",
+      },
     },
     onUpdate: ({ editor }) => onChange(editor.getMarkdown()),
   });
