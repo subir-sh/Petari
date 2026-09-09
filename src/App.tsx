@@ -91,6 +91,7 @@ async function openStickyWindow(path: string, metadata: PetariMetadata) {
     minHeight: 180,
     decorations: false,
     resizable: true,
+    skipTaskbar: true,
   });
 }
 
@@ -206,7 +207,7 @@ function ListView() {
     <main className="note-list">
       <header className="note-list__titlebar" data-tauri-drag-region>
         <span className="note-list__title" data-tauri-drag-region>Petari</span>
-        <button className="icon-button" title="Close" onClick={() => getCurrentWindow().close()}>×</button>
+        <button className="icon-button" title="Minimize" onClick={() => getCurrentWindow().minimize()}>×</button>
       </header>
 
       <div className="note-list__search">
