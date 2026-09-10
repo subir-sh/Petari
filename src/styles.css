@@ -292,10 +292,11 @@ input {
   min-height: 38px;
   align-items: stretch;
   border-bottom: 1px solid rgb(0 0 0 / 7%);
+  background: var(--sticky-bg);
 }
 
 .note-list__item:hover {
-  background: rgb(0 0 0 / 5%);
+  background: color-mix(in srgb, var(--sticky-bg) 95%, black);
 }
 
 .note-list__open {
