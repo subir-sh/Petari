@@ -337,7 +337,7 @@ function ListView() {
 
       <div className="note-list__items">
         {filteredStickies.map((sticky) => (
-          <div key={sticky.path} className="note-list__item">
+          <div key={sticky.path} className={`note-list__item sticky--${sticky.document.petari.color}`}>
             <button className="note-list__open" onClick={() => openSticky(sticky)}>
               <span className="note-list__number">{sticky.number}</span>
               <span className="note-list__preview">{preview(sticky.document.body)}</span>
@@ -371,7 +371,6 @@ function StickyView({ path }: { path: string }) {
   };
 
   const persist = () => {
-    if (editorRef.current?.isComposing()) return;
     const current = syncEditorBody();
     if (!current) return;
     void writeTextFile(current.path, serializeStickyDocument(current.document));
