@@ -138,6 +138,21 @@ async function openStickyWindow(path: string, metadata: PetariMetadata) {
   });
 }
 
+function createListWindow(visible = true) {
+  return new WebviewWindow("list", {
+    url: "index.html?list=1",
+    title: "Petari",
+    width: 320,
+    height: 420,
+    minWidth: 260,
+    minHeight: 280,
+    decorations: false,
+    resizable: true,
+    visible,
+    focus: visible,
+  });
+}
+
 async function openListWindow() {
   localStorage.setItem(LIST_VISIBLE_KEY, "true");
   const existing = await WebviewWindow.getByLabel("list");
@@ -147,15 +162,20 @@ async function openListWindow() {
     return;
   }
 
-  new WebviewWindow("list", {
-    url: "index.html?list=1",
-    title: "Petari",
-    width: 320,
-    height: 420,
-    minWidth: 260,
-    minHeight: 280,
-    decorations: false,
-    resizable: true,
+  createListWindow();
+}
+
+async function ensureListTaskbarHost() {
+  const existing = await WebviewWindow.getByLabel("list");
+  if (existing) return;
+
+  localStorage.setItem(LIST_VISIBLE_KEY, "false");
+  const listWindow = createListWindow(false);
+  listWindow.once("tauri://created", () => {
+    void (async () => {
+      await listWindow.show();
+      await listWindow.minimize();
+    })();
   });
 }
 
@@ -175,6 +195,7 @@ function Bootstrap() {
       if (open.length === 0) {
         await openListWindow();
       } else {
+        await ensureListTaskbarHost();
         await Promise.all(open.map((sticky) => openStickyWindow(sticky.path, sticky.document.petari)));
       }
 
