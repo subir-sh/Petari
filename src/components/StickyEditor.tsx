@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { forwardRef, useImperativeHandle } from "react";
+import { forwardRef, useEffect, useImperativeHandle } from "react";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { Markdown } from "@tiptap/markdown";
 import { EditorContent, useEditor } from "@tiptap/react";
@@ -7,7 +7,7 @@ import StarterKit from "@tiptap/starter-kit";
 
 type Props = {
   markdown: string;
-  onChange: (markdown: string) => void;
+  onUpdate: () => void;
 };
 
 export type StickyEditorHandle = {
@@ -16,10 +16,12 @@ export type StickyEditorHandle = {
   toggleBulletList: () => void;
   toggleOrderedList: () => void;
   toggleTaskList: () => void;
+  getMarkdown: () => string;
+  isComposing: () => boolean;
 };
 
 const StickyEditor = forwardRef<StickyEditorHandle, Props>(function StickyEditor(
-  { markdown, onChange },
+  { markdown, onUpdate },
   ref,
 ) {
   const editor = useEditor({
@@ -50,9 +52,45 @@ const StickyEditor = forwardRef<StickyEditorHandle, Props>(function StickyEditor
         void invoke("open_url", { url: link.href });
         return true;
       },
+      handleDOMEvents: {
+        compositionend: () => {
+          queueMicrotask(onUpdate);
+          return false;
+        },
+      },
     },
-    onUpdate: ({ editor }) => onChange(editor.getMarkdown()),
+    onUpdate: ({ editor }) => {
+      if (!editor.view.composing) onUpdate();
+    },
   });
+
+  useEffect(() => {
+    if (!editor) return;
+
+    const textarea = document.createElement("textarea");
+    textarea.tabIndex = -1;
+    textarea.setAttribute("aria-hidden", "true");
+    Object.assign(textarea.style, {
+      position: "fixed",
+      left: "-10000px",
+      width: "1px",
+      height: "1px",
+      opacity: "0",
+      pointerEvents: "none",
+    });
+    document.body.appendChild(textarea);
+
+    const frame = requestAnimationFrame(() => {
+      textarea.focus({ preventScroll: true });
+      textarea.blur();
+      textarea.remove();
+    });
+
+    return () => {
+      cancelAnimationFrame(frame);
+      textarea.remove();
+    };
+  }, [editor]);
 
   useImperativeHandle(ref, () => ({
     toggleBold: () => editor?.chain().focus().toggleBold().run(),
@@ -60,6 +98,8 @@ const StickyEditor = forwardRef<StickyEditorHandle, Props>(function StickyEditor
     toggleBulletList: () => editor?.chain().focus().toggleBulletList().run(),
     toggleOrderedList: () => editor?.chain().focus().toggleOrderedList().run(),
     toggleTaskList: () => editor?.chain().focus().toggleTaskList().run(),
+    getMarkdown: () => editor?.getMarkdown() ?? markdown,
+    isComposing: () => editor?.view.composing ?? false,
   }));
 
   return (

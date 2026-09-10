@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { documentDir, join } from "@tauri-apps/api/path";
 import {
   availableMonitors,
@@ -9,7 +9,7 @@ import {
 } from "@tauri-apps/api/window";
 import { WebviewWindow, getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { mkdir, readDir, readTextFile, remove, writeTextFile } from "@tauri-apps/plugin-fs";
-import StickyEditor, { type StickyEditorHandle } from "./components/StickyEditor";
+import type { StickyEditorHandle } from "./components/StickyEditor";
 import {
   DEFAULT_PETARI_METADATA,
   PETARI_COLORS,
@@ -23,6 +23,7 @@ const params = new URLSearchParams(window.location.search);
 const INITIAL_PATH = params.get("path");
 const IS_LIST = params.has("list");
 const LIST_VISIBLE_KEY = "petari:listVisible";
+const StickyEditor = lazy(() => import("./components/StickyEditor"));
 
 type StickyFile = {
   path: string;
@@ -224,14 +225,13 @@ function ListView() {
   const reload = async () => setStickies(await loadStickies());
 
   useEffect(() => {
-    void reload();
+    if (localStorage.getItem(LIST_VISIBLE_KEY) !== "false") void reload();
     const handleFocus = () => {
       if (activatingRef.current) return;
       activatingRef.current = true;
 
       void (async () => {
         try {
-          await reload();
           const windows = await getAllWebviewWindows();
           const stickyWindows = windows.filter((appWindow) => appWindow.label.startsWith("sticky-"));
 
@@ -243,6 +243,7 @@ function ListView() {
           const listWindow = getCurrentWindow();
           const keepListVisible = localStorage.getItem(LIST_VISIBLE_KEY) !== "false" || stickyWindows.length === 0;
           if (keepListVisible) {
+            await reload();
             localStorage.setItem(LIST_VISIBLE_KEY, "true");
             await listWindow.setFocus();
           } else {
@@ -361,8 +362,17 @@ function StickyView({ path }: { path: string }) {
   const editorRef = useRef<StickyEditorHandle | null>(null);
   const saveTimer = useRef<number | null>(null);
 
-  const persist = () => {
+  const syncEditorBody = () => {
     const current = stickyRef.current;
+    if (!current) return null;
+    const body = editorRef.current?.getMarkdown();
+    if (body !== undefined) current.document.body = body;
+    return current;
+  };
+
+  const persist = () => {
+    if (editorRef.current?.isComposing()) return;
+    const current = syncEditorBody();
     if (!current) return;
     void writeTextFile(current.path, serializeStickyDocument(current.document));
   };
@@ -418,11 +428,7 @@ function StickyView({ path }: { path: string }) {
     };
   }, []);
 
-  const updateBody = (body: string) => {
-    if (!stickyRef.current) return;
-    stickyRef.current.document.body = body;
-    schedulePersist();
-  };
+  const updateBody = () => schedulePersist();
 
   const toggleAlwaysOnTop = async () => {
     if (!stickyRef.current) return;
@@ -455,10 +461,11 @@ function StickyView({ path }: { path: string }) {
   };
 
   const closeSticky = async () => {
-    if (!stickyRef.current) return;
     if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
-    stickyRef.current.document.petari.open = false;
-    await writeTextFile(stickyRef.current.path, serializeStickyDocument(stickyRef.current.document));
+    const current = syncEditorBody();
+    if (!current) return;
+    current.document.petari.open = false;
+    await writeTextFile(current.path, serializeStickyDocument(current.document));
     await getCurrentWindow().close();
   };
 
@@ -469,7 +476,7 @@ function StickyView({ path }: { path: string }) {
       <header className="sticky__titlebar" data-tauri-drag-region>
         <span className="sticky__title" data-tauri-drag-region>{sticky.number}</span>
 
-        <div className="sticky__format-actions">
+        <div className="sticky__format-actions" onMouseDown={(event) => event.preventDefault()}>
           <button className="icon-button" title="Bold" onMouseDown={(event) => {
             event.preventDefault();
             editorRef.current?.toggleBold();
@@ -497,7 +504,7 @@ function StickyView({ path }: { path: string }) {
 
         <span className="sticky__divider" />
 
-        <div className="sticky__window-actions">
+        <div className="sticky__window-actions" onMouseDown={(event) => event.preventDefault()}>
           <button className="icon-button sticky__secondary-control" title="Notes list" onClick={openListWindow}>☷</button>
           <button className="icon-button" title="New sticky" onClick={createSticky}>+</button>
           <button className="icon-button sticky__secondary-control" title="Always on top" onClick={toggleAlwaysOnTop}>
@@ -507,7 +514,9 @@ function StickyView({ path }: { path: string }) {
           <button className="icon-button" title="Close" onClick={closeSticky}>×</button>
         </div>
       </header>
-      <StickyEditor ref={editorRef} markdown={sticky.document.body} onChange={updateBody} />
+      <Suspense fallback={<section className="sticky__editor-shell" />}>
+        <StickyEditor ref={editorRef} markdown={sticky.document.body} onUpdate={updateBody} />
+      </Suspense>
     </main>
   );
 }
